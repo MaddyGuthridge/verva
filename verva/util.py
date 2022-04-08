@@ -1,7 +1,7 @@
 
 from typing import Callable
 
-def getCallableSignature(func: Callable) -> str:
+def getSignature(func: Callable) -> str:
     """Returns a string "signature" of a callable, used with Verva to identify
     callables, so that they can be referred to within the rest of
 
