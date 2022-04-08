@@ -1,7 +1,7 @@
 
-from typing import Callable
+from typing import Any
 
-def getSignature(func: Callable) -> str:
+def getSignature(obj: Any) -> str:
     """Returns a string "signature" of a callable, used with Verva to identify
     callables, so that they can be referred to within the rest of
 
@@ -13,4 +13,4 @@ def getSignature(func: Callable) -> str:
     Returns:
         str: _description_
     """
-    return func.__module__ + '.' + func.__qualname__
+    return obj.__module__ + '.' + obj.__qualname__
