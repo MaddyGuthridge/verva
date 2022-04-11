@@ -14,9 +14,11 @@ Registerable = Union[type, Callable]
 
 T = TypeVar('T', bound=Registerable)
 
+
 class ItemContainer(Generic[T]):
     """A simple container for items registered with Verva
     """
+
     def __init__(
         self,
         item: T,
@@ -28,6 +30,7 @@ class ItemContainer(Generic[T]):
     @property
     def item(self) -> T:
         return self._item
+
 
 class VervaContext:
     """
@@ -50,7 +53,6 @@ class VervaContext:
         # For now we'll only manage basic functions
         self._items: dict[str, list[ItemContainer]] = {}
 
-
     def register(
         self,
         min_version: VersionType = None,
@@ -63,6 +65,10 @@ class VervaContext:
         Args:
             min_version (VersionSpec): minimum version to call this function
             max_version (VersionSpec): maximum version to call this function
+
+        Raises:
+            OverlappingVersionException: this function's versions overlap
+                with another already registered version
 
         Decorates:
             func (Callable): function to register
@@ -91,3 +97,20 @@ class VervaContext:
         if not isinstance(obj, str):
             obj = getSignature(obj)
         return obj in self._items
+
+    def get_version_mapping(self, signature: str, target_version: VersionType) -> Registerable:
+        """Returns a mapping to a registered value if  a mapping exists for the
+        target version
+
+        Args:
+            signature (str): signature to search for
+            target_version (VersionType): API version to target
+
+        Raises:
+            SignatureNotFound: no mapping found for signature
+            NoMatchingVersion: no version of the target
+
+        Returns:
+            Registerable: value registered to that function
+        """
+        raise KeyError("No mapping found for signature")
