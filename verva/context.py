@@ -9,6 +9,7 @@ requirements.
 from typing import Any, TypeVar, Generic, Callable, Union
 from verva.util import getSignature
 from verva.version import VersionSpec, VersionType
+from verva.exceptions import OverlappingVersionException
 
 Registerable = Union[type, Callable]
 
@@ -30,6 +31,10 @@ class ItemContainer(Generic[T]):
     @property
     def item(self) -> T:
         return self._item
+
+    @property
+    def version(self) -> VersionSpec:
+        return self._version
 
 
 class VervaContext:
@@ -76,11 +81,16 @@ class VervaContext:
         def wrapper(obj: T) -> T:
             # Get the location of the callable, for lookup later
             sign = getSignature(obj)
+            # Check that the version spec is valid
+            v = VersionSpec(min_version, max_version)
+            for item in self._items.get(sign, []):
+                if v.overlap(item.version):
+                    raise OverlappingVersionException(
+                        "Can't register overlapping version")
             # Append to the list of implementations of that sign
-            self._items[sign] = self._items.get(sign, []) + [ItemContainer(
-                obj,
-                VersionSpec(min_version, max_version)
-            )]
+            self._items[sign] = self._items.get(sign, []) + [
+                ItemContainer(obj, v)
+            ]
             return obj
         return wrapper
 
