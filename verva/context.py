@@ -9,7 +9,11 @@ requirements.
 from typing import Any, TypeVar, Generic, Callable, Union
 from verva.util import getSignature
 from verva.version import VersionSpec, VersionType
-from verva.exceptions import OverlappingVersionException
+from verva.exceptions import (
+    OverlappingVersionException,
+    SignatureNotFoundException,
+    NoMatchingVersionException,
+)
 
 Registerable = Union[type, Callable]
 
@@ -56,7 +60,7 @@ class VervaContext:
         """
         self._name = name
         # For now we'll only manage basic functions
-        self._items: dict[str, list[ItemContainer]] = {}
+        self._items: dict[str, list[ItemContainer[Registerable]]] = {}
 
     def register(
         self,
@@ -108,6 +112,21 @@ class VervaContext:
             obj = getSignature(obj)
         return obj in self._items
 
+    def num_versions(self, obj: Union[str, Registerable]) -> int:
+        """Return the number of different versions of obj registered with this
+        context
+
+        Args:
+            obj (Union[str, Registerable]): either the object to check or the
+                signature string of it
+
+        Returns:
+            int: the number of times obj is registered
+        """
+        if not isinstance(obj, str):
+            obj = getSignature(obj)
+        return len(self._items.get(obj, []))
+
     def get_version_mapping(self, signature: str, target_version: VersionType) -> Registerable:
         """Returns a mapping to a registered value if  a mapping exists for the
         target version
@@ -117,10 +136,16 @@ class VervaContext:
             target_version (VersionType): API version to target
 
         Raises:
-            SignatureNotFound: no mapping found for signature
-            NoMatchingVersion: no version of the target
+            SignatureNotFoundException: no mapping found for signature
+            NoMatchingVersionException: no version of the target
 
         Returns:
             Registerable: value registered to that function
         """
-        raise KeyError("No mapping found for signature")
+        if signature not in self._items:
+            raise SignatureNotFoundException("No mapping found for signature")
+
+        for item in self._items[signature]:
+            if target_version in item.version:
+                return item.item
+        raise NoMatchingVersionException("No matching version found for item")
