@@ -6,11 +6,13 @@ package to manage its front-facing functions and document their version
 requirements.
 """
 
-from typing import Any, TypeVar, Generic, Union, Optional
+from typing import Any, TypeVar, Generic, Callable, Union
 from verva.util import getSignature
 from verva.version import VersionSpec, VersionType
 
-T = TypeVar('T')
+Registerable = Union[type, Callable]
+
+T = TypeVar('T', bound=Registerable)
 
 class ItemContainer(Generic[T]):
     """A simple container for items registered with Verva
@@ -65,12 +67,27 @@ class VervaContext:
         Decorates:
             func (Callable): function to register
         """
-        def wrapper(self, obj: T) -> T:
+        def wrapper(obj: T) -> T:
             # Get the location of the callable, for lookup later
             sign = getSignature(obj)
-            self._items[sign] = ItemContainer(
+            # Append to the list of implementations of that sign
+            self._items[sign] = self._items.get(sign, []) + [ItemContainer(
                 obj,
                 VersionSpec(min_version, max_version)
-            )
+            )]
             return obj
         return wrapper
+
+    def is_registered(self, obj: Union[str, Registerable]) -> bool:
+        """Returns whether obj is registered with this context
+
+        Args:
+            obj (str | Registerable): either the object to check or the
+                signature string of it
+
+        Returns:
+            bool: whether obj is registered
+        """
+        if not isinstance(obj, str):
+            obj = getSignature(obj)
+        return obj in self._items
