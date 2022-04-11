@@ -46,6 +46,10 @@ class VersionSpec:
         self._min = min_version
         self._max = max_version
 
+        # Check that min < max
+        if not self.__tuple_lt(self._min, self._max):
+            raise ValueError("Minimum version must be < maximum version")
+
     def __repr__(self) -> str:
         start = ""
         end = ""
@@ -95,7 +99,7 @@ class VersionSpec:
         """
         return (
             # Our minimum value is less than their minimum
-            self.__tuple_lt(self._min, other._min)
+            self.__tuple_lt(self._min, other._min, eq=True)
             # And our maximum value is greater than their minimum
             and self.__tuple_lt(other._min, self._max)
         )
