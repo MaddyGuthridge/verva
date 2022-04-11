@@ -1,8 +1,32 @@
 
-from typing import TYPE_CHECKING, Any, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Optional, Union, Literal
 from itertools import zip_longest
 
-VersionType = Union[int, tuple[int, ...], None]
+
+class Inf:
+    """Simple infinity representation"""
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+    def __lt__(self, other):
+        return False
+
+    def __le__(self, other):
+        return False
+
+    def __gt__(self, other):
+        return True
+
+    def __repr__(self) -> str:
+        return "inf"
+
+
+VersionExpanded = tuple[Union[int, Inf], ...]
+VersionType = Union[int, VersionExpanded, None]
+
 
 class VersionSpec:
 
@@ -13,8 +37,12 @@ class VersionSpec:
     ) -> None:
         if isinstance(min_version, int):
             min_version = (min_version,)
+        elif min_version is None:
+            min_version = (0,)
         if isinstance(max_version, int):
             max_version = (max_version,)
+        elif max_version is None:
+            max_version = (Inf(),)
         self._min = min_version
         self._max = max_version
 
@@ -27,34 +55,58 @@ class VersionSpec:
             end = f"< {'.'.join(map(str, self._max))} "
         if self._min is not None:
             start = f">= {'.'.join(map(str, self._min))}"
-        return f"VersionSpec( {start}{end})"
+        return f"VersionSpec( {start}, {end})"
 
-    def __check_min(self, obj: tuple[int, ...]) -> bool:
-        if self._min is None:
-            return True
-        for min_e, act_e in zip_longest(self._min, obj, fillvalue=0):
-            if act_e < min_e:
+    @staticmethod
+    def __tuple_lt(
+        a: VersionExpanded,
+        b: VersionExpanded,
+        eq: bool = False,
+    ) -> bool:
+        """Return whether a < b for tuples
+        """
+        for a_, b_ in zip_longest(a, b, fillvalue=0):
+            if a_ < b_:
+                return True
+            elif a_ > b_:
                 return False
-        return True
-    def __check_max(self, obj: tuple[int, ...]) -> bool:
-        if self._max is None:
-            return True
-        for max_e, act_e in zip_longest(self._max, obj, fillvalue=0):
-            if act_e > max_e:
-                return False
-        return not obj == self._max
+        return eq
 
     def __contains__(self, obj: Any) -> bool:
+        """Return whether a version is contained within this version range
+        """
+        e = "Version numbers should be of type int or tuple[int, ...]"
         if isinstance(obj, int):
             obj = (obj,)
         elif not isinstance(obj, tuple):
-            raise TypeError(
-                "Version numbers should be of type int or tuple[int, ...]"
-            )
+            raise TypeError(e)
         for ele in obj:
-            if not isinstance(ele, int): raise TypeError(
-                "Version numbers should be of type int or tuple[int, ...]"
-            )
+            if not isinstance(ele, int):
+                raise TypeError(e)
 
         # Check version by version
-        return self.__check_min(obj) and self.__check_max(obj)
+        return (
+            self.__tuple_lt(self._min, obj, eq=True)
+            and self.__tuple_lt(obj, self._max)
+        )
+
+    def __do_overlap(self, other: VersionSpec) -> bool:
+        """Implementation of overlap() function, behaving one way
+        """
+        return (
+            # Our minimum value is less than their minimum
+            self.__tuple_lt(self._min, other._min)
+            # And our maximum value is greater than their minimum
+            and self.__tuple_lt(other._min, self._max)
+        )
+
+    def overlap(self, other: VersionSpec) -> bool:
+        """Returns whether two VersionSpec objects overlap
+
+        Args:
+            other (VersionSpec): other version spec
+
+        Returns:
+            bool: whether they overlap
+        """
+        return self.__do_overlap(other) or other.__do_overlap(self)
