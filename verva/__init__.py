@@ -9,3 +9,4 @@ all front-facing package features.
 
 from .util import getSignature
 from .context import VervaContext
+from .manager import VervaManager

@@ -8,6 +8,7 @@ requirements.
 
 from typing import TypeVar, Generic, Callable, Union
 from verva.util import getSignature
+from verva.manager import VervaManager
 from verva.version import VersionSpec, VersionType
 from verva.exceptions import (
     OverlappingVersionException,
@@ -46,7 +47,11 @@ class VervaContext:
     against target version numbers.
     """
 
-    def __init__(self, name: str) -> None:
+    def __init__(
+        self,
+        name: str,
+        mapped_imports: list[str],
+    ) -> None:
         """Create a VervaContext
 
         This is used by packages to manage all the functions provided by the
@@ -55,11 +60,15 @@ class VervaContext:
 
         Args:
             name (str): name of the context
+
+            mapped_imports (list[str]): list of module names that this context
+            should be mapped to
         """
         self._name = name
         # For now we'll only manage basic functions
         self._originals: dict[str, Callable] = {}
         self._items: dict[str, list[ItemContainer[Callable]]] = {}
+        VervaManager.registerContext(self, mapped_imports)
 
     def register(
         self,
