@@ -6,7 +6,7 @@ package to manage its front-facing functions and document their version
 requirements.
 """
 
-from typing import Any, TypeVar, Generic, Callable, Union
+from typing import TypeVar, Generic, Callable, Union
 from verva.util import getSignature
 from verva.version import VersionSpec, VersionType
 from verva.exceptions import (
@@ -15,9 +15,7 @@ from verva.exceptions import (
     NoMatchingVersionException,
 )
 
-Registerable = Union[type, Callable]
-
-T = TypeVar('T', bound=Registerable)
+T = TypeVar('T', bound=Callable)
 
 
 class ItemContainer(Generic[T]):
@@ -60,10 +58,12 @@ class VervaContext:
         """
         self._name = name
         # For now we'll only manage basic functions
-        self._items: dict[str, list[ItemContainer[Registerable]]] = {}
+        self._originals: dict[str, Callable] = {}
+        self._items: dict[str, list[ItemContainer[Callable]]] = {}
 
     def register(
         self,
+        applies_to: Callable,
         min_version: VersionType = None,
         max_version: VersionType = None,
     ):
@@ -72,7 +72,11 @@ class VervaContext:
         This function should be used as a decorator.
 
         Args:
+            applies_to (Callable): original function that we are adding an
+            alternate interface to
+
             min_version (VersionSpec): minimum version to call this function
+
             max_version (VersionSpec): maximum version to call this function
 
         Raises:
@@ -82,9 +86,9 @@ class VervaContext:
         Decorates:
             func (Callable): function to register
         """
-        def wrapper(obj: T) -> T:
+        def wrapper(obj: Callable) -> Callable:
             # Get the location of the callable, for lookup later
-            sign = getSignature(obj)
+            sign = getSignature(applies_to)
             # Check that the version spec is valid
             v = VersionSpec(min_version, max_version)
             for item in self._items.get(sign, []):
@@ -98,36 +102,37 @@ class VervaContext:
             return obj
         return wrapper
 
-    def is_registered(self, obj: Union[str, Registerable]) -> bool:
-        """Returns whether obj is registered with this context
+    def is_registered(self, func: Union[str, Callable]) -> bool:
+        """Returns whether func is registered with this context
 
         Args:
-            obj (str | Registerable): either the object to check or the
+            func (str | Callable): either the function to check or the
                 signature string of it
 
         Returns:
             bool: whether obj is registered
         """
-        if not isinstance(obj, str):
-            obj = getSignature(obj)
-        return obj in self._items
+        if not isinstance(func, str):
+            func = getSignature(func)
+        return func in self._items
 
-    def num_versions(self, obj: Union[str, Registerable]) -> int:
+    def num_versions(self, sign: str) -> int:
         """Return the number of different versions of obj registered with this
         context
 
         Args:
-            obj (Union[str, Registerable]): either the object to check or the
-                signature string of it
+            sign (str): the signature string to query
 
         Returns:
             int: the number of times obj is registered
         """
-        if not isinstance(obj, str):
-            obj = getSignature(obj)
-        return len(self._items.get(obj, []))
+        return len(self._items.get(sign, []))
 
-    def get_version_mapping(self, signature: str, target_version: VersionType) -> Registerable:
+    def get_version_mapping(
+        self,
+        signature: str,
+        target_version: VersionType
+    ) -> Callable:
         """Returns a mapping to a registered value if  a mapping exists for the
         target version
 
